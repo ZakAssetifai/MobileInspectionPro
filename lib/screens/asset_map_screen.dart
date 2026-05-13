@@ -12,6 +12,7 @@ import '../theme/app_colors.dart';
 import '../widgets/section_card.dart';
 import '../widgets/status_chip.dart';
 import 'asset_detail_screen.dart';
+import 'new_asset_dialog.dart';
 
 /// "Map view" — Step 1 of 2 · Select asset.
 ///
@@ -276,6 +277,25 @@ class _AssetMapScreenState extends State<AssetMapScreen> {
         counter++;
       }
     }
+  }
+
+  /// Adds a single asset to the map points collection
+  void _addAssetPoint(Asset asset) {
+    final pt = ArcGISPoint(
+      x: asset.lng,
+      y: asset.lat,
+      spatialReference: SpatialReference.wgs84,
+    );
+
+    _points.add(_AssetPoint(
+      id: asset.id,
+      name: asset.name,
+      kind: asset.kind,
+      point: pt,
+      inspected: false,
+      lastInspected: null,
+      asset: asset,
+    ));
   }
 
   Future<void> _loadFeaturesAsPoints(MmpkSetupResult result) async {
@@ -543,6 +563,75 @@ class _AssetMapScreenState extends State<AssetMapScreen> {
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // ---- "+ New Asset" button ----
+                      Positioned(
+                        left: 12,
+                        top: 52,
+                        child: Material(
+                          elevation: 4,
+                          borderRadius: BorderRadius.circular(22),
+                          color: AppColors.primary,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(22),
+                            onTap: () async {
+                              final currentViewpoint = await _mapController.getCurrentViewpoint(ViewpointType.centerAndScale);
+                              final center = currentViewpoint?.targetGeometry as ArcGISPoint?;
+                              final lat = center?.y ?? ArcgisConfig.riyadhLat;
+                              final lng = center?.x ?? ArcgisConfig.riyadhLng;
+
+                              if (!mounted) return;
+                              final created = await NewAssetDialog.show(
+                                context,
+                                lat: lat,
+                                lng: lng,
+                              );
+                              if (created != null && mounted) {
+                                setState(() {
+                                  DummyData.assets.add(created);
+                                  // Add the new asset to the map as a point
+                                  _addAssetPoint(created);
+                                  _refreshGraphics();
+                                });
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Created ${created.id} · ${created.name}'),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 9,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(
+                                    Icons.add_location_alt_outlined,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    '+ NEW ASSET',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11.5,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
