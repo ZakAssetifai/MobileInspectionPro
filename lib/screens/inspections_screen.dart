@@ -133,10 +133,16 @@ class _InspectionsScreenState extends State<InspectionsScreen> {
                   ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AssetsScreen()),
-                  ),
+                  onPressed: () {
+                    debugPrint('🟢 InspectionsScreen: New button clicked - navigating to AssetsScreen');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) {
+                        debugPrint('🟢 InspectionsScreen: Building AssetsScreen route');
+                        return const AssetsScreen();
+                      }),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryLight,
                     foregroundColor: AppColors.primary,

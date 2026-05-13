@@ -13,6 +13,7 @@ class AssetsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🔵 AssetsScreen building - "How will you find the asset?" screen');
     final isTablet = Responsive.isTablet(context);
     final pad = isTablet ? 32.0 : 16.0;
     // Wrap in Material so the screen works both as a tab (inside ShellScreen's

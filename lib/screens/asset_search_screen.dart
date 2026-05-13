@@ -20,6 +20,7 @@ class _AssetSearchScreenState extends State<AssetSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🟠 AssetSearchScreen building - Asset registry list screen');
     final list = DummyData.assets.where((a) {
       if (_kind == 'BRIDGE' && a.kind != AssetKind.bridge) return false;
       if (_kind == 'CULVERT' && a.kind != AssetKind.culvert) return false;
