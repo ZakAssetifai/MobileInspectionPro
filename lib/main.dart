@@ -10,13 +10,13 @@ void main() {
 
   // ArcGIS Maps SDK — required for MMPK loading + ArcGISMapView. Replace
   // the placeholder in lib/config/arcgis_config.dart with your own key.
-  if (ArcgisConfig.hasValidApiKey) {
+  /*if (ArcgisConfig.hasValidApiKey) {
     ArcGISEnvironment.apiKey = ArcgisConfig.apiKey;
   } else {
     debugPrint(
         '⚠️  ArcGIS API key is not set. Map screen will show a setup banner. '
         'Add your key in lib/config/arcgis_config.dart.');
-  }
+  }*/
 
   // Tablets: prefer landscape but allow rotation.
   SystemChrome.setPreferredOrientations(const [

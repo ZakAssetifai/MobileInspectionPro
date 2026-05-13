@@ -79,7 +79,7 @@ class AssetsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _MethodCard(
+                    /*_MethodCard(
                       title: '+ New asset on the field',
                       subtitle:
                           'Drop a pin at your current location and create a new asset record',
@@ -97,7 +97,7 @@ class AssetsScreen extends StatelessWidget {
                           );
                         }
                       },
-                    ),
+                    ),*/
                   ],
                 ),
               ),

@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../core/responsive.dart';
 import '../data/models.dart';
 import '../theme/app_colors.dart';
@@ -101,7 +105,29 @@ class _NewAssetDialogState extends State<NewAssetDialog> {
   String? _deckSurface;
   final _traffic = TextEditingController();
   final _skew = TextEditingController();
-  int _photoCount = 0;
+  final List<File> _photos = [];
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _capture(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 90,
+      );
+      if (picked == null) return;
+      setState(() => _photos.add(File(picked.path)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.red,
+          duration: const Duration(seconds: 4),
+          content: Text('Could not open ${source == ImageSource.camera ? 'camera' : 'gallery'}: $e'),
+        ),
+      );
+    }
+  }
 
   static const _materials = ['Reinforced concrete', 'Pre-stressed concrete',
       'Steel girder', 'Steel-concrete composite', 'Masonry', 'Timber'];
@@ -325,25 +351,26 @@ class _NewAssetDialogState extends State<NewAssetDialog> {
 
                 const _SectionLabel('PHOTOS'),
                 const SizedBox(height: 8),
-                Row(children: [
-                  if (_photoCount > 0)
-                    Container(
-                      width: 80, height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.thumbnailMint,
-                        borderRadius: BorderRadius.circular(10),
+                Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: [
+                    for (var i = 0; i < _photos.length; i++)
+                      _PhotoThumb(
+                        file: _photos[i],
+                        onRemove: () => setState(() => _photos.removeAt(i)),
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${_photoCount} ↑',
-                        style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700),
-                      ),
+                    _AddPhoto(
+                      label: 'CAMERA',
+                      icon: Icons.photo_camera_outlined,
+                      onTap: () => _capture(ImageSource.camera),
                     ),
-                  if (_photoCount > 0) const SizedBox(width: 8),
-                  _AddPhoto(onTap: () => setState(() => _photoCount++)),
-                ]),
+                    _AddPhoto(
+                      label: 'GALLERY',
+                      icon: Icons.photo_library_outlined,
+                      onTap: () => _capture(ImageSource.gallery),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 20),
               ],
             ),
@@ -507,8 +534,14 @@ class _Dropdown<T> extends StatelessWidget {
 }
 
 class _AddPhoto extends StatelessWidget {
-  const _AddPhoto({required this.onTap});
+  const _AddPhoto({
+    required this.onTap,
+    this.label = 'ADD',
+    this.icon = Icons.photo_camera_outlined,
+  });
   final VoidCallback onTap;
+  final String label;
+  final IconData icon;
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -525,19 +558,54 @@ class _AddPhoto extends StatelessWidget {
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.photo_camera_outlined,
-                color: AppColors.textSecondary, size: 22),
-            SizedBox(height: 4),
-            Text('ADD',
-                style: TextStyle(
+          children: [
+            Icon(icon, color: AppColors.textSecondary, size: 22),
+            const SizedBox(height: 4),
+            Text(label,
+                style: const TextStyle(
                     color: AppColors.textTertiary,
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.0)),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PhotoThumb extends StatelessWidget {
+  const _PhotoThumb({required this.file, required this.onRemove});
+  final File file;
+  final VoidCallback onRemove;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 80, height: 80,
+      child: Stack(children: [
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.file(file, fit: BoxFit.cover),
+          ),
+        ),
+        Positioned(
+          right: 4, top: 4,
+          child: InkWell(
+            onTap: onRemove,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 22, height: 22,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.close, color: Colors.white, size: 14),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }

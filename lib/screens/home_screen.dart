@@ -381,8 +381,8 @@ class _StartNewCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(14),

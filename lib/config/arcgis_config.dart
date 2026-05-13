@@ -12,7 +12,7 @@ class ArcgisConfig {
 
   /// Your Esri API key. The map screen will throw a clear error message in
   /// debug if this is left as the placeholder.
-  static const String apiKey = 'YOUR_ARCGIS_API_KEY';
+ /* static const String apiKey = 'YOUR_ARCGIS_API_KEY';*/
 
   /// Bundled location of the MMPK file inside the Flutter `assets/`
   /// directory. Must also be listed in pubspec.yaml.
@@ -42,6 +42,6 @@ class ArcgisConfig {
   static const double initialScale = 35000;
 
   /// Returns true if the API key has actually been replaced.
-  static bool get hasValidApiKey =>
-      apiKey.isNotEmpty && apiKey != 'YOUR_ARCGIS_API_KEY';
+ /* static bool get hasValidApiKey =>
+      apiKey.isNotEmpty && apiKey != 'YOUR_ARCGIS_API_KEY';*/
 }

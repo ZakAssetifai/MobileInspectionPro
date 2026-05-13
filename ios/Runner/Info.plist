@@ -29,6 +29,25 @@
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>
+	<key>NSCameraUsageDescription</key>
+    <string>BridgeInspect Pro needs camera access for inspection photos, QR scanning, and AR mesh capture.</string>
+
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>BridgeInspect Pro needs access to your photo library to import inspection photos.</string>
+
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>BridgeInspect Pro saves annotated images back to your photo library.</string>
+
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>BridgeInspect Pro tags inspections with your location while you're working in the field.</string>
+
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>BridgeInspect Pro can share your live location with your supervisor while on duty.</string>
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Microphone access is requested only if voice notes are enabled.</string>
+
+    <key>NSAppTransportSecurity</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
@@ -45,5 +64,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<dict>
+      <key>NSAllowsLocalNetworking</key>
+      <true/>
+      <key>NSExceptionDomains</key>
+      <dict>
+        <key>localhost</key>
+        <dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+        <key>127.0.0.1</key>
+        <dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+      </dict>
 </dict>
 </plist>

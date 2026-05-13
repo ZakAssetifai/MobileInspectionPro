@@ -604,7 +604,7 @@ class _ElementTile extends StatelessWidget {
             Row(children: [
               Container(
                 width: 40,
-                height: 40,
+                height: 38,
                 decoration: BoxDecoration(
                   color: hasRating
                       ? element.rating!.color.withOpacity(0.18)

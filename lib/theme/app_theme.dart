@@ -52,7 +52,7 @@ class AppTheme {
           fontWeight: FontWeight.w700,
         ),
       ),
-      cardTheme:CardThemeData (
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         margin: EdgeInsets.zero,

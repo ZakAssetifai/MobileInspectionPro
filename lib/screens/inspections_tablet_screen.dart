@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import '../data/dummy_data.dart';
 import '../data/models.dart';
 import '../theme/app_colors.dart';
+import '../widgets/inspection_card.dart';
+import '../widgets/mmpk_map_view.dart';
 import '../widgets/status_chip.dart';
 import 'inspection_routine_screen.dart';
 import 'inspection_view_screen.dart';
 import 'asset_detail_screen.dart';
 import 'asset_registry_screen.dart' show AssetRegistryScreen;
 
-/// Tablet-only Inspections screen — matches the design video:
-/// map left, scrollable inspections-grouped-by-asset right.
+/// Tablet-only Inspections screen — matches the design video with MAP/GRID
+/// toggle, working filters, and the real MMPK map.
 class InspectionsTabletScreen extends StatefulWidget {
   const InspectionsTabletScreen({super.key});
 
@@ -24,47 +26,58 @@ class _InspectionsTabletScreenState extends State<InspectionsTabletScreen> {
   String _inspectionType = 'All inspection types';
   String _status = 'Any status';
   String _inspector = 'All inspectors';
+  bool _mapView = true;
 
-  // Returns inspections grouped by asset (only assets that have ≥1 record).
-  Map<Asset, List<Inspection>> get _grouped {
-    final byAsset = <Asset, List<Inspection>>{};
-    for (final i in DummyData.inspections) {
+  // Build the actual filter pipeline — every dropdown now narrows the list.
+  List<Inspection> get _filteredFlat {
+    return DummyData.inspections.where((i) {
       final a = i.asset;
-      if (_assetType == 'Bridges' && a.kind != AssetKind.bridge) continue;
-      if (_assetType == 'Culverts' && a.kind != AssetKind.culvert) continue;
+      if (_assetType == 'Bridges' && a.kind != AssetKind.bridge) return false;
+      if (_assetType == 'Culverts' && a.kind != AssetKind.culvert) return false;
       if (_inspectionType != 'All inspection types' &&
-          i.kind.label.toLowerCase() != _inspectionType.toLowerCase()) {
-        continue;
+          i.kind.label.toUpperCase() != _inspectionType.toUpperCase()) {
+        return false;
       }
-      if (_status == 'DRAFT' && i.status != InspectionStatus.draft) continue;
+      if (_status == 'DRAFT' && i.status != InspectionStatus.draft) return false;
       if (_status == 'SUBMITTED' && i.status != InspectionStatus.submitted) {
-        continue;
+        return false;
       }
-      if (_status == 'SYNCED' && i.status != InspectionStatus.synced) continue;
+      if (_status == 'SYNCED' && i.status != InspectionStatus.synced) return false;
+      if (_inspector != 'All inspectors' && i.inspector != _inspector) {
+        return false;
+      }
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         if (!a.name.toLowerCase().contains(q) &&
             !a.id.toLowerCase().contains(q) &&
-            !a.city.toLowerCase().contains(q)) {
-          continue;
+            !a.city.toLowerCase().contains(q) &&
+            !i.id.toLowerCase().contains(q)) {
+          return false;
         }
       }
-      byAsset.putIfAbsent(a, () => []).add(i);
+      return true;
+    }).toList();
+  }
+
+  Map<Asset, List<Inspection>> get _grouped {
+    final byAsset = <Asset, List<Inspection>>{};
+    for (final i in _filteredFlat) {
+      byAsset.putIfAbsent(i.asset, () => []).add(i);
     }
     return byAsset;
   }
 
   @override
   Widget build(BuildContext context) {
+    final flat = _filteredFlat;
     final grouped = _grouped;
-    final totalRecs = grouped.values.fold<int>(0, (s, v) => s + v.length);
 
     return Material(
       color: AppColors.background,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
+          // ----- Header (with MAP / GRID toggle + + New) -----
           Container(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
             color: AppColors.surface,
@@ -86,24 +99,18 @@ class _InspectionsTabletScreenState extends State<InspectionsTabletScreen> {
                       style: TextStyle(
                           fontWeight: FontWeight.w700, fontSize: 18)),
                   Text(
-                    '$totalRecs records · ${grouped.length} assets',
+                    '${flat.length} records · ${grouped.length} assets',
                     style: const TextStyle(
                         color: AppColors.textTertiary, fontSize: 12),
                   ),
                 ],
               ),
               const Spacer(),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.list_alt, size: 16),
-                label: const Text('List',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.border),
-                    minimumSize: const Size(0, 44)),
+              _ViewToggle(
+                mapView: _mapView,
+                onChanged: (v) => setState(() => _mapView = v),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               ElevatedButton.icon(
                 onPressed: () => Navigator.push(
                   context,
@@ -122,7 +129,7 @@ class _InspectionsTabletScreenState extends State<InspectionsTabletScreen> {
             ]),
           ),
 
-          // Filter row
+          // ----- Filter row -----
           Container(
             color: AppColors.surface,
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
@@ -167,49 +174,75 @@ class _InspectionsTabletScreenState extends State<InspectionsTabletScreen> {
             ]),
           ),
 
-          // Body: map + grouped list
+          // ----- Body — MAP / GRID variant -----
           Expanded(
-            child: Row(children: [
-              Expanded(flex: 2, child: _MapPlaceholder(grouped: grouped)),
-              Expanded(
-                flex: 1,
-                child: Container(
-                  color: AppColors.primaryLight.withOpacity(0.4),
-                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                      child: Row(children: [
-                        const Text('INSPECTIONS',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11,
-                                letterSpacing: 1.2,
-                                color: AppColors.textSecondary)),
-                        const Spacer(),
-                        Text(
-                          '${grouped.length} assets',
-                          style: const TextStyle(
-                              color: AppColors.textTertiary, fontSize: 12),
-                        ),
-                      ]),
-                    ),
+            child: _mapView
+                ? Row(children: [
                     Expanded(
-                      child: ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: grouped.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
-                          final asset = grouped.keys.elementAt(i);
-                          final list = grouped[asset]!;
-                          return _AssetGroup(asset: asset, inspections: list);
-                        },
+                      flex: 2,
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(20, 4, 8, 16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: MmpkMapView(
+                            assets: grouped.keys.toList(),
+                            onAssetTap: (a) => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      AssetDetailScreen(asset: a)),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ]),
-                ),
-              ),
-            ]),
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        color: AppColors.primaryLight.withOpacity(0.4),
+                        padding: const EdgeInsets.fromLTRB(8, 8, 20, 16),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                            child: Row(children: [
+                              const Text('INSPECTIONS',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                      letterSpacing: 1.2,
+                                      color: AppColors.textSecondary)),
+                              const Spacer(),
+                              Text(
+                                '${grouped.length} assets',
+                                style: const TextStyle(
+                                    color: AppColors.textTertiary,
+                                    fontSize: 12),
+                              ),
+                            ]),
+                          ),
+                          Expanded(
+                            child: ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: grouped.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (_, i) {
+                                final asset = grouped.keys.elementAt(i);
+                                final list = grouped[asset]!;
+                                return _AssetGroup(
+                                    asset: asset, inspections: list);
+                              },
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ])
+                : _GridBody(items: flat),
           ),
         ],
       ),
@@ -258,154 +291,72 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _MapPlaceholder extends StatelessWidget {
-  const _MapPlaceholder({required this.grouped});
-  final Map<Asset, List<Inspection>> grouped;
+class _ViewToggle extends StatelessWidget {
+  const _ViewToggle({required this.mapView, required this.onChanged});
+  final bool mapView;
+  final ValueChanged<bool> onChanged;
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 8, 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(children: [
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFFD3E2EA), Color(0xFFEAF1F0)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: CustomPaint(painter: _LandPainter()),
-            ),
-          ),
-          // Asset pins
-          for (final entry in grouped.entries) _pinFor(entry.key, entry.value),
-
-          // Map mode pill (decorative)
-          Positioned(
-            top: 12, right: 12,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: const [
-                _MiniPill(label: 'MAP', selected: true),
-                _MiniPill(label: 'SAT'),
-              ]),
-            ),
-          ),
-        ]),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(20),
       ),
-    );
-  }
-
-  Widget _pinFor(Asset a, List<Inspection> records) {
-    final allAssets = grouped.keys.toList();
-    if (allAssets.isEmpty) return const SizedBox.shrink();
-    final minLat = allAssets.map((x) => x.lat).reduce((a, b) => a < b ? a : b);
-    final maxLat = allAssets.map((x) => x.lat).reduce((a, b) => a > b ? a : b);
-    final minLng = allAssets.map((x) => x.lng).reduce((a, b) => a < b ? a : b);
-    final maxLng = allAssets.map((x) => x.lng).reduce((a, b) => a > b ? a : b);
-    final latRange = (maxLat - minLat).abs() < 1 ? 1.0 : (maxLat - minLat);
-    final lngRange = (maxLng - minLng).abs() < 1 ? 1.0 : (maxLng - minLng);
-    final x = (a.lng - minLng) / lngRange;
-    final y = 1 - (a.lat - minLat) / latRange;
-    return Align(
-      alignment: Alignment(x * 2 - 1, y * 2 - 1),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Text(a.id,
-              style: const TextStyle(
-                  fontSize: 9, fontWeight: FontWeight.w700)),
-        ),
-        Icon(
-          Icons.location_on,
-          size: 22,
-          color: a.kind == AssetKind.bridge
-              ? AppColors.primary
-              : AppColors.statusDraft,
-        ),
-        if (records.length > 1)
-          Transform.translate(
-            offset: const Offset(0, -8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: AppColors.severityHigh,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white, width: 1.4),
-              ),
-              child: Text('${records.length}',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700)),
-            ),
-          ),
+      padding: const EdgeInsets.all(3),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        _toggle('MAP VIEW', mapView, () => onChanged(true)),
+        _toggle('GRID VIEW', !mapView, () => onChanged(false)),
       ]),
     );
   }
-}
 
-class _MiniPill extends StatelessWidget {
-  const _MiniPill({required this.label, this.selected = false});
-  final String label;
-  final bool selected;
-  @override
-  Widget build(BuildContext context) {
-    final fg = selected ? Colors.white : AppColors.textSecondary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
+  Widget _toggle(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: selected ? AppColors.primary : Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                letterSpacing: 0.6)),
       ),
-      child: Text(label,
-          style: TextStyle(
-              color: fg,
-              fontWeight: FontWeight.w700,
-              fontSize: 10.5,
-              letterSpacing: 0.6)),
     );
   }
 }
 
-class _LandPainter extends CustomPainter {
+class _GridBody extends StatelessWidget {
+  const _GridBody({required this.items});
+  final List<Inspection> items;
   @override
-  void paint(Canvas canvas, Size size) {
-    final landPaint = Paint()..color = const Color(0xFFE9E1D6);
-    final coast = Path()
-      ..moveTo(size.width * 0.10, size.height * 0.20)
-      ..quadraticBezierTo(size.width * 0.30, size.height * 0.10,
-          size.width * 0.55, size.height * 0.20)
-      ..quadraticBezierTo(size.width * 0.85, size.height * 0.30,
-          size.width * 0.90, size.height * 0.55)
-      ..quadraticBezierTo(size.width * 0.95, size.height * 0.85,
-          size.width * 0.55, size.height * 0.85)
-      ..quadraticBezierTo(size.width * 0.20, size.height * 0.95,
-          size.width * 0.05, size.height * 0.65)
-      ..close();
-    canvas.drawPath(coast, landPaint);
-    final grid = Paint()..color = Colors.white.withOpacity(0.4);
-    for (var i = 1; i < 10; i++) {
-      final dx = size.width * i / 10;
-      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), grid);
-      final dy = size.height * i / 10;
-      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), grid);
-    }
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 560,
+        mainAxisExtent: 110,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+      ),
+      itemBuilder: (_, i) => InspectionCard(
+        inspection: items[i],
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => items[i].status == InspectionStatus.draft
+                ? InspectionRoutineScreen(inspection: items[i])
+                : InspectionViewScreen(inspection: items[i]),
+          ),
+        ),
+      ),
+    );
   }
-  @override bool shouldRepaint(covariant _LandPainter old) => false;
 }
 
 class _AssetGroup extends StatefulWidget {

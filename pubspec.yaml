@@ -35,7 +35,11 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   arcgis_maps: ^200.8.0+4672
+  image_picker: ^1.1.2     # gallery + camera for new-asset photos / annotations
+  camera: ^0.11.0          # live camera surface (AR capture, future)
 
+  # ---- QR / barcode scanning ----
+  mobile_scanner: ^5.2.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

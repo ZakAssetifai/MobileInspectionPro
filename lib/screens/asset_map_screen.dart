@@ -392,7 +392,7 @@ class _AssetMapScreenState extends State<AssetMapScreen> {
         text: p.id,
         color: const Color(0xFF0A2540),
         size: 10,
-   /*     haloColor: Colors.white,
+       /* haloColor: Colors.white,
         haloWidth: 3,*/
       )..offsetY = isSelected ? 22 : 18;
 
@@ -431,7 +431,7 @@ class _AssetMapScreenState extends State<AssetMapScreen> {
       y: ArcgisConfig.riyadhLat,
       spatialReference: SpatialReference.wgs84,
     );
-    _mapController.setViewpoint(
+     _mapController.setViewpoint(
       Viewpoint.fromCenter(centre, scale: ArcgisConfig.initialScale),
     );
   }

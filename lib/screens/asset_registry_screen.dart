@@ -3,6 +3,7 @@ import '../core/responsive.dart';
 import '../data/dummy_data.dart';
 import '../data/models.dart';
 import '../theme/app_colors.dart';
+import '../widgets/mmpk_map_view.dart';
 import '../widgets/status_chip.dart';
 import 'asset_detail_screen.dart';
 import 'asset_scan_screen.dart';
@@ -41,15 +42,79 @@ class _AssetRegistryScreenState extends State<AssetRegistryScreen> {
   bool _sat = false;
   bool _polygonActive = false;
 
+  /// All filter dropdowns drive this getter. Toggling any pill above the map
+  /// or in the right-side `ASSETS` panel narrows the result list live.
   List<Asset> get _filtered {
     return DummyData.assets.where((a) {
+      // Type
       if (_typeFilter == 'Bridges' && a.kind != AssetKind.bridge) return false;
       if (_typeFilter == 'Culverts' && a.kind != AssetKind.culvert) return false;
-      if (_query.isEmpty) return true;
-      final q = _query.toLowerCase();
-      return a.name.toLowerCase().contains(q) ||
-          a.id.toLowerCase().contains(q) ||
-          a.city.toLowerCase().contains(q);
+
+      // Location (province / region match)
+      if (_locFilter != 'All locations' &&
+          !a.region.toLowerCase().contains(_locFilter.toLowerCase()) &&
+          !a.city.toLowerCase().contains(_locFilter.toLowerCase())) {
+        return false;
+      }
+
+      // Status — the dummy data is all active, but we honour the filter.
+      if (_statusFilter == 'Decommissioned') return false;
+
+      // Condition — derived from latest inspection's overallCondition.
+      if (_conditionFilter != 'All conditions') {
+        final last = DummyData.inspections
+            .where((i) => i.asset.id == a.id && i.overallCondition != null)
+            .toList()
+          ..sort((x, y) => (y.submitted ?? y.started)
+              .compareTo(x.submitted ?? x.started));
+        if (last.isEmpty) return false;
+        if (last.first.overallCondition!.label.toLowerCase() !=
+            _conditionFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Year built
+      if (_yearFilter != 'Any year') {
+        if (_yearFilter == '2020+' && a.yearBuilt < 2020) return false;
+        if (_yearFilter == '2010-2019' &&
+            !(a.yearBuilt >= 2010 && a.yearBuilt <= 2019)) return false;
+        if (_yearFilter == '<2010' && a.yearBuilt >= 2010) return false;
+      }
+
+      // Length
+      if (_lengthFilter != 'Any length') {
+        if (_lengthFilter == '<50 m' && a.length >= 50) return false;
+        if (_lengthFilter == '50-200 m' &&
+            !(a.length >= 50 && a.length <= 200)) return false;
+        if (_lengthFilter == '>200 m' && a.length <= 200) return false;
+      }
+
+      // Material
+      if (_materialFilter != 'Any material' &&
+          !a.material.toLowerCase().contains(_materialFilter.toLowerCase())) {
+        // Accept short codes like 'RC' / 'Steel' that just need a substring match
+        final shortMap = {
+          'RC': 'reinforced',
+          'Steel': 'steel',
+          'Composite': 'composite',
+        };
+        final needle =
+            shortMap[_materialFilter]?.toLowerCase() ?? _materialFilter.toLowerCase();
+        if (!a.material.toLowerCase().contains(needle)) return false;
+      }
+
+      // Search
+      if (_query.isNotEmpty) {
+        final q = _query.toLowerCase();
+        if (!a.name.toLowerCase().contains(q) &&
+            !a.id.toLowerCase().contains(q) &&
+            !a.city.toLowerCase().contains(q) &&
+            !a.region.toLowerCase().contains(q)) {
+          return false;
+        }
+      }
+      return true;
     }).toList();
   }
 
@@ -398,19 +463,12 @@ class _MapPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
-            // Mock map background
+            // ---- Real ArcGIS map (MMPK if available, online imagery fallback) ----
             Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: sat
-                        ? const [Color(0xFF1B3A5C), Color(0xFF2D5F8D)]
-                        : const [Color(0xFFD3E2EA), Color(0xFFEAF1F0)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: CustomPaint(painter: _MapPainter(sat: sat)),
+              child: MmpkMapView(
+                assets: assets,
+                onAssetTap: onAssetTap,
+                satelliteByDefault: sat,
               ),
             ),
 
@@ -471,7 +529,9 @@ class _MapPanel extends StatelessWidget {
               ),
             ),
 
-            // Polygon overlay (decorative)
+            // Polygon overlay (decorative — the MMPK doesn't yet emit
+            // the spatial query result, but the visual cue keeps parity
+            // with the design video).
             if (polygon)
               Positioned.fill(
                 child: IgnorePointer(
@@ -479,13 +539,10 @@ class _MapPanel extends StatelessWidget {
                 ),
               ),
 
-            // Pins
-            ..._buildPins(context, assets, sat),
-
             // Attribution
             const Positioned(
               right: 8, bottom: 4,
-              child: Text('Leaflet · OpenStreetMap',
+              child: Text('MMPK · Esri',
                   style: TextStyle(fontSize: 9, color: AppColors.textTertiary)),
             ),
           ],
@@ -493,80 +550,6 @@ class _MapPanel extends StatelessWidget {
       ),
     );
   }
-
-  List<Widget> _buildPins(BuildContext context, List<Asset> assets, bool sat) {
-    if (assets.isEmpty) return const [];
-    final minLat = assets.map((a) => a.lat).reduce((a, b) => a < b ? a : b);
-    final maxLat = assets.map((a) => a.lat).reduce((a, b) => a > b ? a : b);
-    final minLng = assets.map((a) => a.lng).reduce((a, b) => a < b ? a : b);
-    final maxLng = assets.map((a) => a.lng).reduce((a, b) => a > b ? a : b);
-    final latRange = (maxLat - minLat).abs() < 1 ? 1.0 : (maxLat - minLat);
-    final lngRange = (maxLng - minLng).abs() < 1 ? 1.0 : (maxLng - minLng);
-    return assets.map((a) {
-      final x = (a.lng - minLng) / lngRange;
-      final y = 1 - (a.lat - minLat) / latRange;
-      return Align(
-        alignment: Alignment(x * 2 - 1, y * 2 - 1),
-        child: GestureDetector(
-          onTap: () => onAssetTap(a),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Text(a.id,
-                  style: const TextStyle(
-                      fontSize: 9.5,
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(height: 2),
-            Icon(
-              Icons.location_on,
-              size: 22,
-              color: a.kind == AssetKind.bridge
-                  ? AppColors.primary
-                  : AppColors.statusDraft,
-            ),
-          ]),
-        ),
-      );
-    }).toList();
-  }
-}
-
-class _MapPainter extends CustomPainter {
-  _MapPainter({required this.sat});
-  final bool sat;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final landPaint = Paint()
-      ..color = sat ? const Color(0xFF3E5C42) : const Color(0xFFE9E1D6);
-    final coast = Path()
-      ..moveTo(size.width * 0.10, size.height * 0.20)
-      ..quadraticBezierTo(size.width * 0.30, size.height * 0.10,
-          size.width * 0.55, size.height * 0.20)
-      ..quadraticBezierTo(size.width * 0.85, size.height * 0.30,
-          size.width * 0.90, size.height * 0.55)
-      ..quadraticBezierTo(size.width * 0.95, size.height * 0.85,
-          size.width * 0.55, size.height * 0.85)
-      ..quadraticBezierTo(size.width * 0.20, size.height * 0.95,
-          size.width * 0.05, size.height * 0.65)
-      ..close();
-    canvas.drawPath(coast, landPaint);
-    final grid = Paint()..color = (sat ? Colors.white : Colors.white).withOpacity(0.4);
-    for (var i = 1; i < 10; i++) {
-      final dx = size.width * i / 10;
-      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), grid);
-      final dy = size.height * i / 10;
-      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), grid);
-    }
-  }
-  @override bool shouldRepaint(covariant _MapPainter old) => old.sat != sat;
 }
 
 class _PolygonPainter extends CustomPainter {
